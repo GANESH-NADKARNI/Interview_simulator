@@ -1,0 +1,19 @@
+spring:
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  ai:
+    api-key: ${GROQ_API_KEY}
+    model: ${GROQ_MODEL:llama-3.3-70b-versatile}
