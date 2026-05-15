@@ -93,11 +93,7 @@ public class HRService {
     public JsonNode generateQuestions(String expertiseContext) throws Exception {
         String contextClause = (expertiseContext != null && !expertiseContext.isBlank())
             ? "\n\nCANDIDATE PROFILE: " + expertiseContext +
-              "\nAdapt the HR questions specifically to this candidate's domain and level: " +
-              "- Ask about domain-specific team/project experiences " +
-              "- For senior levels, include leadership, architecture decisions, and mentoring questions " +
-              "- For freshers, focus on learning attitude, academics, projects, and career goals " +
-              "- Reference their target role in the questions where appropriate"
+              "\nAdapt the HR questions specifically to this candidate's domain and level."
             : "";
 
         String randomSeed = "Focus areas this session: " + getRandomFocus() +
@@ -118,7 +114,6 @@ public class HRService {
             Audio duration: %s seconds
             
             Analyze this answer thoroughly for content, grammar, tone, word mistakes, and communication skills.
-            Be specific about every grammatical error and word mistake with corrections.
             """, questionJson, transcribedAnswer, audioDurationSeconds);
 
         String response = groqService.chatJson(ANALYZE_SYSTEM, prompt);
@@ -126,16 +121,42 @@ public class HRService {
     }
 
     public JsonNode generateFinalReport(List<JsonNode> questionAnalyses) throws Exception {
+        return generateFinalReport(questionAnalyses, null);
+    }
+
+    public JsonNode generateFinalReport(List<JsonNode> questionAnalyses, JsonNode expressionSummary) throws Exception {
         String analysesJson = mapper.writeValueAsString(questionAnalyses);
+
+        // Build expression context for the prompt
+        String expressionContext = "";
+        if (expressionSummary != null && !expressionSummary.isNull()) {
+            String dominant = expressionSummary.path("dominant").asText("neutral");
+            String confidenceLevel = expressionSummary.path("confidenceLevel").asText("MEDIUM");
+            int readings = expressionSummary.path("totalReadings").asInt(0);
+            expressionContext = String.format("""
+                
+                FACIAL EXPRESSION DATA (captured via camera during interview, %d readings):
+                - Dominant expression: %s
+                - Overall confidence level from expressions: %s
+                - Expression breakdown: %s
+                
+                Use this expression data to provide insight about the candidate's non-verbal confidence.
+                Include a field "expressionInsight" in your response with 1-2 sentences about what
+                the facial expressions reveal about their confidence and comfort level during the interview.
+                """,
+                readings, dominant, confidenceLevel,
+                expressionSummary.path("percentages").toString()
+            );
+        }
 
         String prompt = String.format("""
             Here are the analyses of all 5 HR interview answers for a candidate:
             %s
-            
+            %s
             Create a comprehensive final report.
-            """, analysesJson);
+            """, analysesJson, expressionContext);
 
-        String response = groqService.chatJson("""
+        String systemPrompt = """
             You are creating a final HR interview performance report.
             Respond ONLY with JSON:
             {
@@ -157,10 +178,12 @@ public class HRService {
               "developmentPlan": [
                 {"area": "...", "action": "...", "timeline": "2 weeks"}
               ],
+              "expressionInsight": "1-2 sentences about facial expression data (omit if no expression data)",
               "motivationalMessage": "personalized encouraging closing message"
             }
-            """, prompt);
+            """;
 
+        String response = groqService.chatJson(systemPrompt, prompt);
         return mapper.readTree(response);
     }
 

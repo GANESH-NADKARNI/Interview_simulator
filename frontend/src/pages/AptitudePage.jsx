@@ -6,11 +6,11 @@ import { Brain, ChevronRight, ChevronLeft, Send, RotateCcw, CheckCircle, XCircle
 const DIFF_CLASS = { EASY: 'tag-easy', MEDIUM: 'tag-medium', HARD: 'tag-hard' }
 
 export default function AptitudePage() {
-  const [state, setState] = useState('idle') // idle | loading | quiz | evaluating | result
+  const [state, setState] = useState('idle')
   const [sessionId, setSessionId] = useState(null)
   const [questions, setQuestions] = useState([])
   const [current, setCurrent] = useState(0)
-  const [answers, setAnswers] = useState({}) // { questionId: 'A' }
+  const [answers, setAnswers] = useState({})
   const [result, setResult] = useState(null)
 
   const start = async () => {
@@ -29,7 +29,7 @@ export default function AptitudePage() {
   }
 
   const selectAnswer = (qId, opt) => {
-    const letter = opt.charAt(0) // "A" from "A) ..."
+    const letter = opt.charAt(0)
     setAnswers(prev => ({ ...prev, [qId]: letter }))
   }
 
@@ -41,11 +41,40 @@ export default function AptitudePage() {
     }
     setState('evaluating')
     try {
+      // Send simplified questions to avoid confusion in evaluation
+      const simplifiedQuestions = questions.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        topic: q.topic,
+        type: q.type,
+        difficulty: q.difficulty,
+      }))
       const { data } = await aptitudeApi.evaluate({
         sessionId,
-        questions: questions,
+        questions: simplifiedQuestions,
         answers,
       })
+
+      // Recalculate score and isCorrect ourselves — Groq is unreliable for this
+      if (data.questionFeedback?.length > 0) {
+        let correctCount = 0
+        data.questionFeedback.forEach(qf => {
+          const q = simplifiedQuestions.find(x => String(x.id) === String(qf.questionId))
+          const userAns = (answers[qf.questionId] || qf.userAnswer || '').trim().toUpperCase().charAt(0)
+          const correctAns = (q?.correctAnswer || qf.correctAnswer || '').trim().toUpperCase().charAt(0)
+          qf.isCorrect = userAns === correctAns
+          qf.userAnswer = userAns
+          qf.correctAnswer = correctAns
+          if (qf.isCorrect) correctCount++
+        })
+        const score = Math.round((correctCount / data.questionFeedback.length) * 100)
+        data.totalScore = score
+        data.grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B+' : score >= 60 ? 'B' : score >= 50 ? 'C' : score >= 40 ? 'D' : 'F'
+      }
+
       setResult(data)
       setState('result')
     } catch (e) {
@@ -106,6 +135,9 @@ export default function AptitudePage() {
     const answered = Object.keys(answers).length
     const progress = (answered / questions.length) * 100
 
+    // Check if question references a graph/table/figure (can't render it)
+    const hasVisual = /graph|chart|figure|table below|diagram|image|refer to|following (graph|chart|table|figure)/i.test(q.question)
+
     return (
       <div className="fade-in" style={{ maxWidth: 800, margin: '0 auto' }}>
         {/* Header */}
@@ -125,13 +157,24 @@ export default function AptitudePage() {
           <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent), var(--accent2))', transition: 'width 0.3s', borderRadius: 4 }} />
         </div>
 
+        {/* Visual warning */}
+        {hasVisual && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 10, marginBottom: 16,
+            background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)',
+            fontSize: 13, color: 'var(--yellow)', display: 'flex', gap: 8, alignItems: 'center'
+          }}>
+            ⚠️ This question references a visual (graph/table) that cannot be displayed. The question text contains the data needed to answer it.
+          </div>
+        )}
+
         {/* Question */}
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
             <span className="tag tag-blue" style={{ flexShrink: 0 }}>{q.type}</span>
             <span style={{ fontSize: 12, color: 'var(--text3)', paddingTop: 4 }}>{q.topic}</span>
           </div>
-          <p style={{ fontSize: 16, lineHeight: 1.7, fontWeight: 500 }}>{q.question}</p>
+          <p style={{ fontSize: 16, lineHeight: 1.7, fontWeight: 500, whiteSpace: 'pre-wrap' }}>{q.question}</p>
         </div>
 
         {/* Options */}
@@ -149,8 +192,6 @@ export default function AptitudePage() {
                   fontFamily: 'var(--font)', fontSize: 14, transition: 'all 0.15s',
                   fontWeight: selected ? 600 : 400,
                 }}
-                onMouseEnter={e => { if (!selected) e.currentTarget.style.borderColor = 'var(--border)' }}
-                onMouseLeave={e => { if (!selected) e.currentTarget.style.borderColor = 'var(--border2)' }}
               >
                 {opt}
               </button>
@@ -219,12 +260,10 @@ export default function AptitudePage() {
         </div>
 
         <div className="grid-2" style={{ marginBottom: 24 }}>
-          {/* Strong areas */}
           <div className="card">
             <h3 style={{ fontWeight: 700, marginBottom: 14, color: 'var(--green)' }}>✅ Strong Areas</h3>
             {result.strongAreas?.map(a => <div key={a} style={{ fontSize: 13, color: 'var(--text2)', padding: '4px 0', borderBottom: '1px solid var(--border2)' }}>{a}</div>)}
           </div>
-          {/* Weak areas */}
           <div className="card">
             <h3 style={{ fontWeight: 700, marginBottom: 14, color: 'var(--red)' }}>⚠️ Needs Improvement</h3>
             {result.weakAreas?.map(a => <div key={a} style={{ fontSize: 13, color: 'var(--text2)', padding: '4px 0', borderBottom: '1px solid var(--border2)' }}>{a}</div>)}
@@ -259,21 +298,27 @@ export default function AptitudePage() {
           <h3 style={{ fontWeight: 700, marginBottom: 16 }}>📝 Question Review</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {result.questionFeedback?.map((qf, i) => {
-              const q = questions.find(x => x.id === qf.questionId)
+              const q = questions.find(x => String(x.id) === String(qf.questionId))
+              // Calculate correctness ourselves — don't trust Groq's isCorrect field
+              const userAns = (qf.userAnswer || '').trim().toUpperCase().charAt(0)
+              const correctAns = (qf.correctAnswer || q?.correctAnswer || '').trim().toUpperCase().charAt(0)
+              const isCorrect = userAns === correctAns
               return (
                 <div key={i} style={{
-                  padding: 14, borderRadius: 10, border: `1px solid ${qf.isCorrect ? 'rgba(0,255,136,0.2)' : 'rgba(255,68,102,0.2)'}`,
+                  padding: 14, borderRadius: 10,
+                  border: `1px solid ${qf.isCorrect ? 'rgba(0,255,136,0.2)' : 'rgba(255,68,102,0.2)'}`,
                   background: qf.isCorrect ? 'rgba(0,255,136,0.04)' : 'rgba(255,68,102,0.04)',
                 }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    {qf.isCorrect ? <CheckCircle size={16} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} /> : <XCircle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 2 }} />}
-                    <div>
+                    {qf.isCorrect
+                      ? <CheckCircle size={16} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
+                      : <XCircle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 2 }} />}
+                    <div style={{ width: '100%' }}>
                       <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Q{i + 1}. {q?.question}</p>
-                      {!qf.isCorrect && (
-                        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>
-                          Your answer: <span style={{ color: 'var(--red)' }}>{qf.userAnswer}</span> · Correct: <span style={{ color: 'var(--green)' }}>{qf.correctAnswer}</span>
-                        </div>
-                      )}
+                      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>
+                        Your answer: <span style={{ color: qf.isCorrect ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{qf.userAnswer}</span>
+                        {!qf.isCorrect && <> · Correct: <span style={{ color: 'var(--green)', fontWeight: 700 }}>{qf.correctAnswer}</span></>}
+                      </div>
                       <p style={{ fontSize: 12, color: 'var(--text3)' }}>{qf.explanation}</p>
                     </div>
                   </div>
@@ -283,7 +328,6 @@ export default function AptitudePage() {
           </div>
         </div>
 
-        {/* Improvements */}
         {result.improvements?.length > 0 && (
           <div className="card" style={{ marginBottom: 28 }}>
             <h3 style={{ fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>

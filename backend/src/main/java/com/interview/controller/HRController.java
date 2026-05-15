@@ -33,10 +33,7 @@ public class HRController {
             String expertiseContext = profileRepository.findByUserId(username)
                 .map(p -> p.toAIContext()).orElse(null);
             JsonNode questions = hrService.generateQuestions(expertiseContext);
-            return ResponseEntity.ok(Map.of(
-                "sessionId", session.getId(),
-                "questions", questions
-            ));
+            return ResponseEntity.ok(Map.of("sessionId", session.getId(), "questions", questions));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
@@ -72,7 +69,10 @@ public class HRController {
                 .map(a -> (JsonNode) objectMapper.valueToTree(a))
                 .toList();
 
-            JsonNode finalReport = hrService.generateFinalReport(analysisNodes);
+            Object rawExpr = body.get("expressionSummary");
+            JsonNode expressionSummary = rawExpr != null ? objectMapper.valueToTree(rawExpr) : null;
+
+            JsonNode finalReport = hrService.generateFinalReport(analysisNodes, expressionSummary);
             int score = finalReport.path("overallScore").asInt(0);
             String summary = finalReport.path("executiveSummary").asText("");
             sessionService.completeSession(sessionId, score, finalReport.toString(), summary);
