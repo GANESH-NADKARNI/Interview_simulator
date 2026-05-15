@@ -72,7 +72,10 @@ public class HRController {
             Object rawExpr = body.get("expressionSummary");
             JsonNode expressionSummary = rawExpr != null ? objectMapper.valueToTree(rawExpr) : null;
 
-            JsonNode finalReport = hrService.generateFinalReport(analysisNodes, expressionSummary);
+            Object rawVoice = body.get("voiceMetricsSummary");
+            JsonNode voiceMetricsSummary = rawVoice != null ? objectMapper.valueToTree(rawVoice) : null;
+
+            JsonNode finalReport = hrService.generateFinalReport(analysisNodes, expressionSummary, voiceMetricsSummary);
             int score = finalReport.path("overallScore").asInt(0);
             String summary = finalReport.path("executiveSummary").asText("");
             sessionService.completeSession(sessionId, score, finalReport.toString(), summary);

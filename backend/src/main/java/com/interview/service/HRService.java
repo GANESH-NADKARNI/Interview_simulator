@@ -125,7 +125,13 @@ public class HRService {
     }
 
     public JsonNode generateFinalReport(List<JsonNode> questionAnalyses, JsonNode expressionSummary) throws Exception {
+        return generateFinalReport(questionAnalyses, expressionSummary, null);
+    }
+
+    public JsonNode generateFinalReport(List<JsonNode> questionAnalyses, JsonNode expressionSummary, JsonNode voiceMetricsSummary) throws Exception {
         String analysesJson = mapper.writeValueAsString(questionAnalyses);
+
+        // Note: voiceMetricsSummary is handled client-side; expressionSummary comes from camera
 
         // Build expression context for the prompt
         String expressionContext = "";
@@ -149,12 +155,36 @@ public class HRService {
             );
         }
 
+        // Build voice metrics context
+        String voiceContext = "";
+        if (voiceMetricsSummary != null && !voiceMetricsSummary.isNull() && voiceMetricsSummary.isArray() && voiceMetricsSummary.size() > 0) {
+            int totalPauses = 0;
+            int totalWpm = 0;
+            int count = 0;
+            for (JsonNode m : voiceMetricsSummary) {
+                totalPauses += m.path("pauseCount").asInt(0);
+                int wpm = m.path("wpm").asInt(0);
+                if (wpm > 0) { totalWpm += wpm; count++; }
+            }
+            int avgWpm = count > 0 ? totalWpm / count : 0;
+            voiceContext = String.format("""
+                
+                VOICE ANALYTICS DATA (measured during recording):
+                - Average speaking pace: %d WPM (ideal: 120-150 WPM)
+                - Total pauses detected: %d (many short pauses suggest nervousness)
+                - Number of questions answered: %d
+                
+                Include a field "voiceInsight" with 1-2 sentences about their speaking pace and pause patterns.
+                """, avgWpm, totalPauses, voiceMetricsSummary.size());
+        }
+
         String prompt = String.format("""
             Here are the analyses of all 5 HR interview answers for a candidate:
             %s
             %s
+            %s
             Create a comprehensive final report.
-            """, analysesJson, expressionContext);
+            """, analysesJson, expressionContext, voiceContext);
 
         String systemPrompt = """
             You are creating a final HR interview performance report.
@@ -179,6 +209,7 @@ public class HRService {
                 {"area": "...", "action": "...", "timeline": "2 weeks"}
               ],
               "expressionInsight": "1-2 sentences about facial expression data (omit if no expression data)",
+              "voiceInsight": "1-2 sentences about speaking pace, pauses, and volume patterns (omit if no voice data)",
               "motivationalMessage": "personalized encouraging closing message"
             }
             """;
