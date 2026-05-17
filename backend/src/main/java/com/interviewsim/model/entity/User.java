@@ -16,11 +16,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Document(collection = "users")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class User implements UserDetails {
 
     @Id
@@ -36,6 +32,9 @@ public class User implements UserDetails {
 
     @Builder.Default
     private Role role = Role.USER;
+
+    @Builder.Default
+    private boolean emailVerified = false;
 
     @CreatedDate
     private LocalDateTime createdAt;
@@ -53,5 +52,5 @@ public class User implements UserDetails {
     @Override public boolean isAccountNonExpired()      { return true; }
     @Override public boolean isAccountNonLocked()       { return true; }
     @Override public boolean isCredentialsNonExpired()  { return true; }
-    @Override public boolean isEnabled()                { return true; }
-}   
+    @Override public boolean isEnabled()                { return emailVerified; }
+}

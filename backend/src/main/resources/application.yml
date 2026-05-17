@@ -15,5 +15,13 @@ management:
 
 app:
   ai:
-    api-key: ${GROQ_API_KEY}
+    api-keys: ${GROQ_API_KEYS}   # comma-separated list of keys
     model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+
+resend:
+  api-key: ${RESEND_API_KEY}
+  from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: 86400000

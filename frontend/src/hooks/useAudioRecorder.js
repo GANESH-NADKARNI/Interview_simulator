@@ -27,20 +27,37 @@ export function useAudioRecorder() {
   const isPausedRef = useRef(false)
   const pauseCountRef = useRef(0)
 
-  const PAUSE_THRESHOLD = 15     // volume below this = silence
-  const PAUSE_MIN_DURATION = 800 // ms of silence to count as a pause
+  const PAUSE_THRESHOLD = 22     // volume below this = silence — calibrated: speech ~24-31%, silence ~12-18%
+  const PAUSE_MIN_DURATION = 600 // ms of silence to count as a pause (600ms catches natural sentence gaps)
 
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Sensitivity-friendly: AGC boosts quiet mics, no suppression so normal speech isn't filtered
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: true,
+          sampleRate: 44100,
+        }
+      })
       streamRef.current = stream
 
       // ── Web Audio API setup ──
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 256
+      analyser.fftSize = 1024              // finer resolution — catches quiet speech better
+      analyser.smoothingTimeConstant = 0.6 // smooths flicker without lag
+
+      // 2.5× signal boost so normal speech registers clearly on the meter
+      // NOT connected to destination — zero echo/feedback risk
+      const gainNode = audioContext.createGain()
+      gainNode.gain.value = 2.5
+
       const source = audioContext.createMediaStreamSource(stream)
-      source.connect(analyser)
+      source.connect(gainNode)
+      gainNode.connect(analyser)
+
       audioContextRef.current = audioContext
       analyserRef.current = analyser
 
@@ -54,7 +71,10 @@ export function useAudioRecorder() {
 
       const pollVolume = () => {
         analyser.getByteFrequencyData(dataArray)
-        const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+        // Only lower 60% of bins = voice frequencies (80Hz–8kHz)
+        // Full average drags value down with silent ultrasonic bins
+        const voiceBins = dataArray.slice(0, Math.floor(dataArray.length * 0.6))
+        const avg = voiceBins.reduce((a, b) => a + b, 0) / voiceBins.length
         const vol = Math.round((avg / 255) * 100)
 
         setVolume(vol)

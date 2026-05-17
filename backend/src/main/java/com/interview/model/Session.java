@@ -31,16 +31,21 @@ public class Session {
     private LocalDateTime completedAt;
     private boolean completed = false;
 
+    // Time tracking
+    private long timeTakenSeconds = 0; // total time taken to complete
+    private String timeTakenFormatted = ""; // e.g. "4m 32s"
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class QuestionAnswer {
         private int questionIndex;
         private String question;
-        private String questionData; // JSON with full question details
+        private String questionData;
         private String userAnswer;
         private String aiFeedback;
-        private int score; // out of 10
+        private int score;
+        private long timeSpentSeconds; // time on this specific question
         private List<String> improvements = new ArrayList<>();
         private String hint;
         private String bestApproach;

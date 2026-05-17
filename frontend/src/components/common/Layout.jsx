@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import ChangeUsernameModal from '../ChangeUsernameModal'
 import {
   LayoutDashboard, Brain, Code2, Mic, History,
-  LogOut, Menu, X, Zap, ChevronRight, FileText, Settings
+  LogOut, Menu, X, Zap, ChevronRight, FileText, Settings, Pencil
 } from 'lucide-react'
 
 const NAV = [
@@ -24,6 +25,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showUsernameModal, setShowUsernameModal] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -137,9 +139,20 @@ export default function Layout({ children }) {
             }}>
               {user?.username?.[0]?.toUpperCase() || 'U'}
             </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.username}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)' }}>{user?.email}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {user?.username}
+                <button
+                  onClick={() => setShowUsernameModal(true)}
+                  title="Change username"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 2, borderRadius: 4, display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
             </div>
           </div>
           <button onClick={handleLogout} className="btn btn-ghost"
@@ -174,6 +187,10 @@ export default function Layout({ children }) {
         className="main-content">
         {children}
       </main>
+
+      {showUsernameModal && (
+        <ChangeUsernameModal onClose={() => setShowUsernameModal(false)} />
+      )}
 
       <style>{`
         @media (max-width: 768px) {

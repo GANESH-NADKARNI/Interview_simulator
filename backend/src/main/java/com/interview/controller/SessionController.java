@@ -67,8 +67,29 @@ public class SessionController {
             .mapToInt(Session::getTotalScore).average().orElse(0);
 
         long aptitude = all.stream().filter(s -> "APTITUDE".equals(s.getType()) && s.isCompleted()).count();
-        long coding = all.stream().filter(s -> "CODING".equals(s.getType()) && s.isCompleted()).count();
-        long hr = all.stream().filter(s -> "HR".equals(s.getType()) && s.isCompleted()).count();
+        long coding   = all.stream().filter(s -> "CODING".equals(s.getType())   && s.isCompleted()).count();
+        long hr       = all.stream().filter(s -> "HR".equals(s.getType())       && s.isCompleted()).count();
+
+        // Average time per type
+        double avgAptitudeTime = all.stream()
+            .filter(s -> "APTITUDE".equals(s.getType()) && s.isCompleted() && s.getTimeTakenSeconds() > 0)
+            .mapToLong(Session::getTimeTakenSeconds).average().orElse(0);
+        double avgCodingTime = all.stream()
+            .filter(s -> "CODING".equals(s.getType()) && s.isCompleted() && s.getTimeTakenSeconds() > 0)
+            .mapToLong(Session::getTimeTakenSeconds).average().orElse(0);
+
+        // Score trend (last 10 completed sessions)
+        List<Map<String, Object>> scoreTrend = all.stream()
+            .filter(Session::isCompleted)
+            .sorted((a, b) -> a.getStartedAt().compareTo(b.getStartedAt()))
+            .limit(10)
+            .map(s -> Map.<String, Object>of(
+                "date", s.getStartedAt().toLocalDate().toString(),
+                "score", s.getTotalScore(),
+                "type", s.getType(),
+                "time", s.getTimeTakenSeconds()
+            ))
+            .toList();
 
         return ResponseEntity.ok(Map.of(
             "totalSessions", all.size(),
@@ -76,7 +97,10 @@ public class SessionController {
             "averageScore", Math.round(avgScore),
             "aptitudeCount", aptitude,
             "codingCount", coding,
-            "hrCount", hr
+            "hrCount", hr,
+            "avgAptitudeTimeSecs", Math.round(avgAptitudeTime),
+            "avgCodingTimeSecs", Math.round(avgCodingTime),
+            "scoreTrend", scoreTrend
         ));
     }
 }

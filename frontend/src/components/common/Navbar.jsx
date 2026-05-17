@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import ChangeUsernameModal from './ChangeUsernameModal'
 import { useAuth } from '../../context/AuthContext'
-import { Code2, Trophy, History, LogOut, User, Zap } from 'lucide-react'
+import { Code2, Trophy, History, LogOut, User, Zap, Pencil } from 'lucide-react'
 
 const NAV = [
   { to: '/',            label: 'Problems',    icon: Code2    },
@@ -13,9 +15,12 @@ export default function Navbar() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
 
+  const [showUsernameModal, setShowUsernameModal] = useState(false)
+
   const handleLogout = () => { logout(); navigate('/login') }
 
   return (
+    <>
     <header className="border-b border-white/10 bg-surface-950/80 backdrop-blur-xl sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
@@ -46,15 +51,25 @@ export default function Navbar() {
 
         {/* User menu */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10">
+          <button
+            onClick={() => setShowUsernameModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 hover:border-white/20 hover:bg-white/10 transition-all group"
+            title="Change username"
+          >
             <User className="w-4 h-4 text-slate-400" />
             <span className="text-sm font-medium text-slate-300">{user?.username}</span>
-          </div>
+            <Pencil className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-colors" />
+          </button>
           <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all" title="Logout">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
     </header>
+
+    {showUsernameModal && (
+      <ChangeUsernameModal onClose={() => setShowUsernameModal(false)} />
+    )}
+  </>
   )
 }

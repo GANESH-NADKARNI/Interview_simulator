@@ -20,11 +20,7 @@ const FEATURES = [
   },
 ]
 
-const STATS = [
-  { icon: Users, label: 'Active Users', value: '10K+' },
-  { icon: Star, label: 'Avg Rating', value: '4.9★' },
-  { icon: Trophy, label: 'Jobs Cracked', value: '2.3K+' },
-]
+
 
 export default function Landing() {
   return (
@@ -88,15 +84,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section style={{ display: 'flex', justifyContent: 'center', gap: 48, padding: '40px 20px', flexWrap: 'wrap' }}>
-        {STATS.map(({ icon: Icon, label, value }) => (
-          <div key={label} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 32, fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--accent)' }}>{value}</div>
-            <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4 }}>{label}</div>
-          </div>
-        ))}
-      </section>
+
 
       {/* Features */}
       <section style={{ padding: '60px 60px 100px', maxWidth: 1100, margin: '0 auto' }}>
