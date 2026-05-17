@@ -113,7 +113,7 @@ export default function Register() {
             {otp.map((digit, i) => (
               <input key={i} ref={el => otpRefs.current[i] = el} type="text" inputMode="numeric" maxLength={1} value={digit}
                 onChange={e => handleOtpChange(i, e.target.value)} onKeyDown={e => handleOtpKeyDown(i, e)}
-                style={{ width: 50, height: 56, textAlign: 'center', fontSize: 24, fontWeight: 800, borderRadius: 12, border: `2px solid ${digit ? 'var(--accent)' : 'var(--border2)'}`, background: digit ? 'rgba(0,212,255,0.08)' : 'var(--bg)', color: 'var(--text)', outline: 'none', fontFamily: 'var(--display)' }} />
+                style={{ width: 46, height: 54, textAlign: 'center', fontSize: 22, fontWeight: 800, borderRadius: 12, border: `2px solid ${digit ? 'var(--accent)' : 'var(--border2)'}`, background: digit ? 'rgba(0,212,255,0.08)' : 'var(--bg)', color: 'var(--text)', outline: 'none', fontFamily: 'monospace', lineHeight: 1, padding: 0, boxSizing: 'border-box' }} />
             ))}
           </div>
           <button className="btn btn-primary" onClick={handleVerify} disabled={loading || otp.join('').length !== 6} style={{ justifyContent: 'center', padding: '13px' }}>
