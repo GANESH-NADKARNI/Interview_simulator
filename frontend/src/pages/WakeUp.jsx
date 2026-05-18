@@ -253,7 +253,7 @@ export default function WakeUp() {
             </p>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 28, fontSize: 12, color: '#fbbf24' }}>
               <span>⏱</span>
-              <span>First load may take up to <strong>5 minutes</strong></span>
+              <span>First load may take up to <strong>2 minutes</strong></span>
             </div>
             <button
               onClick={handleStart}
