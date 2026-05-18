@@ -45,10 +45,13 @@ function ActivityHeatmap({ sessions, createdAt }) {
   const { weeks, map } = useMemo(() => {
     // Build date→count map (only on/after account creation)
     const map = {}
-    sessions.forEach(s => {
-      const d = new Date(s.startedAt)
-      d.setHours(0, 0, 0, 0)
-      if (d >= accountStart) {
+sessions.forEach(s => {
+  const raw = s.startedAt || ''
+  const d = new Date(raw.endsWith('Z') ? raw : raw + 'Z')
+  const key = d.toLocaleDateString('en-CA') // YYYY-MM-DD in local tz
+  const localD = new Date(key)
+  localD.setHours(0, 0, 0, 0)
+  if (localD >= accountStart) {
         const key = d.toISOString().split('T')[0]
         map[key] = (map[key] || 0) + 1
       }
@@ -455,7 +458,7 @@ export default function Dashboard() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>
-                    {new Date(s.startedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date((s.startedAt||'').endsWith('Z') ? s.startedAt : (s.startedAt||'')+'Z').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
                   {s.timeTakenSeconds > 0 && (
                     <div style={{ fontSize: 11, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
