@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Slf4j
 @Service
@@ -39,14 +39,33 @@ public class AuthService {
     // ── Register (sends OTP, doesn't log in yet) ─────────────────────────────
     @Transactional
     public void register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new ApiException("Username already taken", HttpStatus.CONFLICT);
-        }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ApiException("Email already registered", HttpStatus.CONFLICT);
-        }
 
-        // Save user as unverified
+        // Username check: reject if VERIFIED, clean up if unverified ghost
+        userRepository.findByUsername(request.getUsername()).ifPresent(existing -> {
+            if (existing.isEmailVerified()) {
+                throw new ApiException("Username already taken", HttpStatus.CONFLICT);
+            }
+            // Ghost account with same username but different email — delete it
+            if (!existing.getEmail().equals(request.getEmail())) {
+                otpTokenRepository.deleteAllByEmail(existing.getEmail());
+                userRepository.delete(existing);
+                log.info("Deleted unverified ghost (username conflict) for email: {}", existing.getEmail());
+            }
+            // If same email, the email-check block below will handle it
+        });
+
+        // Email check: reject if VERIFIED, clean up if unverified ghost
+        userRepository.findByEmail(request.getEmail()).ifPresent(existing -> {
+            if (existing.isEmailVerified()) {
+                throw new ApiException("Email already registered", HttpStatus.CONFLICT);
+            }
+            // Unverified ghost — wipe it so they can re-register cleanly
+            otpTokenRepository.deleteAllByEmail(existing.getEmail());
+            userRepository.delete(existing);
+            log.info("Deleted unverified ghost account for email: {}", existing.getEmail());
+        });
+
+        // Save new unverified user
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
@@ -56,7 +75,6 @@ public class AuthService {
                 .build();
         userRepository.save(user);
 
-        // Send verification OTP
         sendOtp(request.getEmail(), OtpToken.OtpType.VERIFY_EMAIL);
     }
 
@@ -79,6 +97,15 @@ public class AuthService {
 
     // ── Login ─────────────────────────────────────────────────────────────────
     public LoginResponse login(LoginRequest request) {
+        // Check for unverified account BEFORE hitting AuthenticationManager,
+        // so we can resend the OTP and return a helpful error instead of "Bad credentials"
+        userRepository.findByUsername(request.getUsername()).ifPresent(u -> {
+            if (!u.isEmailVerified()) {
+                sendOtp(u.getEmail(), OtpToken.OtpType.VERIFY_EMAIL);
+                throw new ApiException("EMAIL_NOT_VERIFIED:" + u.getEmail(), HttpStatus.FORBIDDEN);
+            }
+        });
+
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
@@ -87,27 +114,23 @@ public class AuthService {
         User user = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
 
-        if (!user.isEmailVerified()) {
-            // Resend OTP and inform frontend
-            sendOtp(user.getEmail(), OtpToken.OtpType.VERIFY_EMAIL);
-            throw new ApiException("EMAIL_NOT_VERIFIED:" + user.getEmail(), HttpStatus.FORBIDDEN);
-        }
-
         String token = tokenProvider.generateToken(userDetails);
         return buildLoginResponse(user, token);
     }
 
     // ── Forgot password → send OTP ────────────────────────────────────────────
     public void forgotPassword(String email) {
-        userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApiException("No account found with this email", HttpStatus.NOT_FOUND));
+        if (!user.isEmailVerified()) {
+            throw new ApiException("Account is not verified. Please complete registration first.", HttpStatus.BAD_REQUEST);
+        }
         sendOtp(email, OtpToken.OtpType.RESET_PASSWORD);
     }
 
     // ── Verify reset OTP ──────────────────────────────────────────────────────
     public void verifyResetOtp(String email, String otp) {
         validateOtp(email, otp, OtpToken.OtpType.RESET_PASSWORD);
-        // Mark as used but keep for reset step
         OtpToken token = otpTokenRepository
                 .findTopByEmailAndTypeAndUsedFalseOrderByCreatedAtDesc(email, OtpToken.OtpType.RESET_PASSWORD)
                 .orElseThrow(() -> new ApiException("OTP not found", HttpStatus.BAD_REQUEST));
@@ -118,13 +141,11 @@ public class AuthService {
     // ── Reset password ────────────────────────────────────────────────────────
     @Transactional
     public void resetPassword(String email, String otp, String newPassword) {
-        // Re-validate (used=true means it was verified in the previous step)
-        OtpToken otpToken = otpTokenRepository
-                .findTopByEmailAndTypeAndUsedFalseOrderByCreatedAtDesc(email, OtpToken.OtpType.RESET_PASSWORD)
-                .orElse(null);
+        // Guard: verifyResetOtp must have been called first (marks the token used=true)
+        if (!otpTokenRepository.existsByEmailAndTypeAndUsedTrue(email, OtpToken.OtpType.RESET_PASSWORD)) {
+            throw new ApiException("OTP verification required before resetting password", HttpStatus.FORBIDDEN);
+        }
 
-        // Allow if otp was already marked used in verify step (within same session)
-        // Check by finding any recent token for this email
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
 
@@ -167,7 +188,6 @@ public class AuthService {
         user.setUsername(newUsername);
         userRepository.save(user);
 
-        // Re-issue JWT so the new username is reflected in the token
         String token = tokenProvider.generateToken(user);
         return buildLoginResponse(user, token);
     }
@@ -181,13 +201,12 @@ public class AuthService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().name())
-                .createdAt(user.getCreatedAt().toString())
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
                 .build();
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
     private void sendOtp(String email, OtpToken.OtpType type) {
-        // Delete existing unused OTPs of same type
         otpTokenRepository.deleteAllByEmailAndType(email, type);
 
         String otp = String.format("%06d", random.nextInt(1000000));
@@ -197,8 +216,8 @@ public class AuthService {
                 .otp(otp)
                 .type(type)
                 .used(false)
-                .createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(600)) // 10 minutes
                 .build();
         otpTokenRepository.save(token);
 
@@ -208,7 +227,7 @@ public class AuthService {
     private void validateOtp(String email, String otp, OtpToken.OtpType type) {
         OtpToken token = otpTokenRepository
                 .findTopByEmailAndTypeAndUsedFalseOrderByCreatedAtDesc(email, type)
-                .orElseThrow(() -> new ApiException("Invalid or expired OTP", HttpStatus.BAD_REQUEST));
+                .orElseThrow(() -> new ApiException("Invalid or expired OTP. Please request a new one.", HttpStatus.BAD_REQUEST));
 
         if (token.isExpired()) {
             throw new ApiException("OTP has expired. Please request a new one.", HttpStatus.BAD_REQUEST);

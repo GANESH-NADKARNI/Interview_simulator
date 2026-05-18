@@ -5,7 +5,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Document(collection = "otp_tokens")
 @Data @NoArgsConstructor @AllArgsConstructor @Builder
@@ -23,13 +23,17 @@ public class OtpToken {
 
     private boolean used = false;
 
-    @Indexed(expireAfterSeconds = 600) // auto-delete after 10 minutes
-    private LocalDateTime createdAt;
+    // Stored as plain timestamp — NOT indexed for TTL (createdAt is just metadata)
+    private Instant createdAt;
 
-    private LocalDateTime expiresAt;
+    // TTL index: MongoDB deletes the document when the current time passes this field.
+    // expireAfterSeconds = 0 means "delete as soon as expiresAt is reached".
+    // MUST be Instant (BSON Date) — LocalDateTime does NOT work with MongoDB TTL.
+    @Indexed(expireAfterSeconds = 0)
+    private Instant expiresAt;
 
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+        return Instant.now().isAfter(expiresAt);
     }
 
     public enum OtpType {

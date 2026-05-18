@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export const useAuthStore = create((set) => ({
+export const useAuthStore = create((set, get) => ({
   user: JSON.parse(localStorage.getItem('user') || 'null'),
   token: localStorage.getItem('token') || null,
 
@@ -11,9 +11,12 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: () => {
-    localStorage.clear()
+    // Only remove auth-related keys — don't wipe unrelated app data
+    localStorage.removeItem('user')
+    localStorage.removeItem('token')
     set({ user: null, token: null })
   },
 
-  isAuthenticated: () => !!localStorage.getItem('token'),
+  // Read from Zustand state, not localStorage directly — stays in sync with setAuth/logout
+  isAuthenticated: () => !!get().token,
 }))
