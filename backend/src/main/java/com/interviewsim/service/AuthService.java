@@ -225,6 +225,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .expiresIn(86400000L)
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
                 .build();
     }
 }

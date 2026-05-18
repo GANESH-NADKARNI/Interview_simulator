@@ -28,9 +28,15 @@ function ActivityHeatmap({ sessions, createdAt }) {
   const currentYear = parseInt(todayKey.slice(0, 4))
 
   const accountStartKey = useMemo(() => {
-    const d = createdAt ? new Date(createdAt) : new Date()
-    return d.toISOString().split('T')[0]
-  }, [createdAt])
+    if (createdAt) return new Date(createdAt).toISOString().split('T')[0]
+    // Fall back to earliest session date so no sessions get filtered out
+    const dates = sessions
+      .map(s => s.startedAt || '')
+      .filter(Boolean)
+      .map(raw => new Date(raw.endsWith('Z') ? raw : raw + 'Z').toISOString().split('T')[0])
+      .sort()
+    return dates[0] || new Date().toISOString().split('T')[0]
+  }, [createdAt, sessions])
   const startYear = parseInt(accountStartKey.slice(0, 4))
 
   const availableYears = useMemo(() => {
@@ -400,7 +406,7 @@ export default function Dashboard() {
             <Calendar size={16} color="var(--accent)" /> Practice Activity
             <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text3)' }}>— last 12 months</span>
           </h3>
-          <ActivityHeatmap sessions={allSessions} />
+          <ActivityHeatmap sessions={allSessions} createdAt={user?.createdAt} />
           <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 12 }}>
             {allSessions.length} total sessions · Keep your streak going!
           </p>
