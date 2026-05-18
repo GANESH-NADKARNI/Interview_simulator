@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom'
 
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
+// Poll config: 30 attempts × 10s = 5 minutes
+const MAX_ATTEMPTS = 30
+const POLL_INTERVAL = 10000
+
 // Particles floating in background
 function Particles() {
   const particles = Array.from({ length: 30 }, (_, i) => ({
@@ -50,10 +54,8 @@ function RingLoader({ progress }) {
 
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-      {/* Background ring */}
       <circle cx={size/2} cy={size/2} r={r}
         fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
-      {/* Progress ring */}
       <circle cx={size/2} cy={size/2} r={r}
         fill="none" stroke="url(#ringGrad)" strokeWidth={stroke}
         strokeDasharray={`${dash} ${circ}`}
@@ -71,10 +73,10 @@ function RingLoader({ progress }) {
 }
 
 const STAGES = [
-  { label: 'Waking up server...', pct: 15 },
-  { label: 'Connecting to database...', pct: 35 },
-  { label: 'Loading AI models...', pct: 60 },
-  { label: 'Almost ready...', pct: 85 },
+  { label: 'Waking up server...', pct: 10 },
+  { label: 'Connecting to database...', pct: 30 },
+  { label: 'Loading AI models...', pct: 55 },
+  { label: 'Almost ready...', pct: 80 },
   { label: 'All systems go!', pct: 100 },
 ]
 
@@ -84,8 +86,10 @@ export default function WakeUp() {
   const [stageIdx, setStageIdx] = useState(0)
   const [progress, setProgress] = useState(0)
   const [dots, setDots] = useState('')
+  const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef(null)
   const startTimeRef = useRef(null)
+  const elapsedRef = useRef(null)
 
   // Skip wake-up if already done this session
   useEffect(() => {
@@ -102,20 +106,33 @@ export default function WakeUp() {
     return () => clearInterval(t)
   }, [phase])
 
-  // Advance stages while waiting
+  // Elapsed timer
+  useEffect(() => {
+    if (phase !== 'waking') {
+      clearInterval(elapsedRef.current)
+      return
+    }
+    elapsedRef.current = setInterval(() => {
+      setElapsed(Math.round((Date.now() - startTimeRef.current) / 1000))
+    }, 1000)
+    return () => clearInterval(elapsedRef.current)
+  }, [phase])
+
+  // Advance stages spread across 5 minutes
   useEffect(() => {
     if (phase !== 'waking') return
     let i = 0
+    const stageInterval = (MAX_ATTEMPTS * POLL_INTERVAL) / STAGES.length
     const advance = () => {
       if (i < STAGES.length - 1) {
         i++
         setStageIdx(i)
         setProgress(STAGES[i].pct)
-        timerRef.current = setTimeout(advance, 1800 + Math.random() * 800)
+        timerRef.current = setTimeout(advance, stageInterval)
       }
     }
     setProgress(STAGES[0].pct)
-    timerRef.current = setTimeout(advance, 1800)
+    timerRef.current = setTimeout(advance, stageInterval)
     return () => clearTimeout(timerRef.current)
   }, [phase])
 
@@ -123,21 +140,29 @@ export default function WakeUp() {
     setPhase('waking')
     setStageIdx(0)
     setProgress(STAGES[0].pct)
+    setElapsed(0)
     startTimeRef.current = Date.now()
 
     const poll = async (attempts = 0) => {
       try {
-        const res = await fetch(`${BACKEND_URL}/actuator/health`, { signal: AbortSignal.timeout(8000) })
-        if (res.ok) {
+        const res = await fetch(`${BACKEND_URL}/actuator/health`, {
+          signal: AbortSignal.timeout(8000)
+        })
+        // ✅ 200 OK = server up and healthy
+        // ✅ 403 Forbidden = Spring Security running = server fully started
+        if (res.ok || res.status === 403) {
           clearTimeout(timerRef.current)
           setStageIdx(STAGES.length - 1)
           setProgress(100)
           setTimeout(() => setPhase('ready'), 800)
           return
         }
-      } catch {}
-      if (attempts < 20) {
-        setTimeout(() => poll(attempts + 1), 4000)
+      } catch {
+        // Network error / timeout = server still sleeping, keep polling
+      }
+
+      if (attempts < MAX_ATTEMPTS - 1) {
+        setTimeout(() => poll(attempts + 1), POLL_INTERVAL)
       } else {
         setPhase('error')
       }
@@ -151,7 +176,11 @@ export default function WakeUp() {
     navigate(token ? '/dashboard' : '/home')
   }
 
-  const elapsed = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0
+  const formatTime = (s) => {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`
+  }
 
   return (
     <div style={{
@@ -224,7 +253,7 @@ export default function WakeUp() {
             </p>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 28, fontSize: 12, color: '#fbbf24' }}>
               <span>⏱</span>
-              <span>First load may take up to <strong>60 seconds</strong></span>
+              <span>First load may take up to <strong>5 minutes</strong></span>
             </div>
             <button
               onClick={handleStart}
@@ -250,12 +279,13 @@ export default function WakeUp() {
         {phase === 'waking' && (
           <>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginBottom: 28 }}>
-              Hang tight, this takes about a minute on free tier
+              Hang tight — this can take up to 5 minutes on free tier
             </p>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
               <RingLoader progress={progress} />
               <div style={{ position: 'absolute', textAlign: 'center' }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: '#00d4ff' }}>{progress}%</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{formatTime(elapsed)}</div>
               </div>
             </div>
             <div style={{
@@ -299,8 +329,11 @@ export default function WakeUp() {
               ✅
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: '#00ff88', marginBottom: 8 }}>Server is ready!</h2>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 28 }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 6 }}>
               Everything is up and running. Let's go!
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, marginBottom: 28 }}>
+              Started in {formatTime(elapsed)}
             </p>
             <button
               onClick={handleContinue}
@@ -323,12 +356,12 @@ export default function WakeUp() {
         {phase === 'error' && (
           <>
             <div style={{ fontSize: 40, marginBottom: 12 }}>😕</div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f87171', marginBottom: 8 }}>Server is taking longer than usual</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f87171', marginBottom: 8 }}>Server didn't respond in 5 minutes</h2>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 24 }}>
-              The server may be restarting. You can try again or proceed anyway.
+              The server may still be starting. You can try again or proceed anyway.
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => { setPhase('idle'); setProgress(0); setStageIdx(0) }}
+              <button onClick={() => { setPhase('idle'); setProgress(0); setStageIdx(0); setElapsed(0) }}
                 style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                 Try Again
               </button>
