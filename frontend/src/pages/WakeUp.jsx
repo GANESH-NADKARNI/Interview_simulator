@@ -279,7 +279,7 @@ export default function WakeUp() {
         {phase === 'waking' && (
           <>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginBottom: 28 }}>
-              Hang tight — this can take up to 5 minutes on free tier
+              Hang tight — this can take up to 2 minutes on free tier
             </p>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
               <RingLoader progress={progress} />
