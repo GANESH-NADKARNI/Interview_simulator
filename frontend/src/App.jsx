@@ -14,6 +14,8 @@ import HRPage from './pages/HRPage'
 import History from './pages/History'
 import ResumePage from './pages/ResumePage'
 import ExpertisePage from './pages/ExpertisePage'
+import WakeUp from './pages/WakeUp'
+
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -23,7 +25,8 @@ function ProtectedRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/"                element={<Landing />} />
+      <Route path="/"                element={<WakeUp />} />
+      <Route path="/home"            element={<Landing />} />
       <Route path="/login"           element={<Login />} />
       <Route path="/register"        element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
