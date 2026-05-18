@@ -19,85 +19,73 @@ function formatTime(s) {
   return m > 0 ? `${m}m ${sec}s` : `${sec}s`
 }
 
-// GitHub-style contribution heatmap
+// GitHub-style contribution heatmap - all dates in UTC to match server storage
 function ActivityHeatmap({ sessions, createdAt }) {
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-  const today = new Date()
-  const currentYear = today.getFullYear()
-  // Normalize accountStart to midnight so date comparisons are stable
-  const accountStart = useMemo(() => {
-    const d = createdAt ? new Date(createdAt) : new Date()
-    d.setHours(0, 0, 0, 0)
-    return d
-  }, [createdAt])
-  const startYear = accountStart.getFullYear()
 
-  // All years from account creation year up to current year, newest first
+  // All date logic in UTC so it matches server-stored timestamps exactly
+  const todayKey = new Date().toISOString().split('T')[0] // YYYY-MM-DD UTC
+  const currentYear = parseInt(todayKey.slice(0, 4))
+
+  const accountStartKey = useMemo(() => {
+    const d = createdAt ? new Date(createdAt) : new Date()
+    return d.toISOString().split('T')[0]
+  }, [createdAt])
+  const startYear = parseInt(accountStartKey.slice(0, 4))
+
   const availableYears = useMemo(() => {
     const years = []
     for (let y = currentYear; y >= startYear; y--) years.push(y)
     return years
   }, [startYear, currentYear])
 
-  // Default to current year
   const [selected, setSelected] = useState(currentYear)
 
   const { weeks, map } = useMemo(() => {
-    // Build date→count map (only on/after account creation)
+    // Build date→count map using UTC date keys to match server-stored timestamps
     const map = {}
-sessions.forEach(s => {
-  const raw = s.startedAt || ''
-  const d = new Date(raw.endsWith('Z') ? raw : raw + 'Z')
-  const key = d.toLocaleDateString('en-CA') // YYYY-MM-DD in local tz
-  const localD = new Date(key)
-  localD.setHours(0, 0, 0, 0)
-  if (localD >= accountStart) {
-        const key = d.toISOString().split('T')[0]
+    sessions.forEach(s => {
+      const raw = s.startedAt || ''
+      const d = new Date(raw.endsWith('Z') ? raw : raw + 'Z')
+      const key = d.toISOString().split('T')[0] // UTC YYYY-MM-DD
+      if (key >= accountStartKey) {
         map[key] = (map[key] || 0) + 1
       }
     })
 
     const y = Number(selected)
 
-    // Determine the visible range for the selected year:
-    // - start: Jan 1 of year, BUT if it's the account creation year use the exact creation date
-    // - end:   Dec 31 of year, BUT if it's the current year cap at today
-    const rangeStart = y === startYear
-      ? new Date(accountStart)                  // exact account creation date
-      : new Date(y, 0, 1)                       // Jan 1
+    // Range as UTC date strings for simple string comparison
+    const rangeStartKey = y === startYear ? accountStartKey : `${y}-01-01`
+    const rangeEndKey   = y === currentYear ? todayKey : `${y}-12-31`
 
-    const rangeEnd = y === currentYear
-      ? new Date(today)                         // today (no future boxes)
-      : new Date(y, 11, 31)                     // Dec 31
+    // Build grid using UTC date arithmetic
+    const rangeStartDate = new Date(rangeStartKey + 'T00:00:00Z')
+    const rangeEndDate   = new Date(rangeEndKey   + 'T00:00:00Z')
 
-    rangeStart.setHours(0, 0, 0, 0)
-    rangeEnd.setHours(0, 0, 0, 0)
-
-    // Align grid start to the Sunday on or before rangeStart
-    const gridStart = new Date(rangeStart)
-    gridStart.setDate(gridStart.getDate() - gridStart.getDay())
+    // Align to Sunday on or before rangeStart (using UTC day-of-week)
+    const gridStart = new Date(rangeStartDate)
+    gridStart.setUTCDate(gridStart.getUTCDate() - gridStart.getUTCDay())
 
     const weeks = []
     let week = []
     const cur = new Date(gridStart)
 
-    while (cur <= rangeEnd || week.length > 0) {
-      if (cur > rangeEnd) {
-        // Pad the last partial week with empty cells
+    while (cur <= rangeEndDate || week.length > 0) {
+      if (cur > rangeEndDate) {
         while (week.length < 7) week.push({ date: '', count: -1, month: -1, day: -1 })
         weeks.push(week)
         break
       }
       const key = cur.toISOString().split('T')[0]
-      // Cells before the account creation date are transparent (count = -1)
-      const inRange = cur >= rangeStart && cur <= rangeEnd
-      week.push({ date: key, count: inRange ? (map[key] || 0) : -1, month: cur.getMonth(), day: cur.getDate() })
-      cur.setDate(cur.getDate() + 1)
+      const inRange = key >= rangeStartKey && key <= rangeEndKey
+      week.push({ date: key, count: inRange ? (map[key] || 0) : -1, month: cur.getUTCMonth(), day: cur.getUTCDate() })
+      cur.setUTCDate(cur.getUTCDate() + 1)
       if (week.length === 7) { weeks.push(week); week = [] }
     }
 
     return { weeks, map }
-  }, [sessions, selected, createdAt])
+  }, [sessions, selected, accountStartKey, todayKey])
 
   const totalSessions = Object.values(map).reduce((a, b) => a + b, 0)
   const activeDays = Object.keys(map).length
