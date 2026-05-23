@@ -30,3 +30,4 @@ mongo_data/
 
 # Logs
 *.log
+firebase-service-account.json

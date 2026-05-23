@@ -28,6 +28,7 @@ public class User implements UserDetails {
     @Indexed(unique = true)
     private String email;
 
+    // Nullable — OAuth users won't have a password
     private String password;
 
     @Builder.Default
@@ -35,6 +36,13 @@ public class User implements UserDetails {
 
     @Builder.Default
     private boolean emailVerified = false;
+
+    // "EMAIL" for normal register, "google.com" or "github.com" for OAuth
+    @Builder.Default
+    private String provider = "EMAIL";
+
+    // Profile picture URL from Google/GitHub (null for email users)
+    private String profilePicture;
 
     @CreatedDate
     private LocalDateTime createdAt;
@@ -52,5 +60,7 @@ public class User implements UserDetails {
     @Override public boolean isAccountNonExpired()      { return true; }
     @Override public boolean isAccountNonLocked()       { return true; }
     @Override public boolean isCredentialsNonExpired()  { return true; }
+
+    // OAuth users have emailVerified=true from Firebase, so isEnabled() = true immediately
     @Override public boolean isEnabled()                { return emailVerified; }
 }

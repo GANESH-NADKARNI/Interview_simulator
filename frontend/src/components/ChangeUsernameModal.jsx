@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { X, User, Check } from 'lucide-react'
 
 export default function ChangeUsernameModal({ onClose }) {
-  const { user, setUser } = useAuthStore()
+  const { user, token, setAuth } = useAuthStore()
   const [newUsername, setNewUsername] = useState('')
   const [loading, setLoading] = useState(false)
   const inputRef = useRef(null)
@@ -27,11 +27,10 @@ export default function ChangeUsernameModal({ onClose }) {
     if (isSame)  return toast.error('That is already your username')
     setLoading(true)
     try {
-      const { data } = await authApi.changeUsername({ username: newUsername.trim() })
+      const { data } = await authApi.changeUsername({ newUsername: newUsername.trim() })
       // Update store + localStorage
       const updated = { ...user, username: data.username || newUsername.trim() }
-      setUser(updated)
-      localStorage.setItem('user', JSON.stringify(updated))
+      setAuth(updated, token)
       toast.success('Username updated!')
       onClose()
     } catch (err) {

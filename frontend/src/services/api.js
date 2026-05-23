@@ -10,7 +10,14 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) { localStorage.clear(); window.location.href = '/login' }
+    const url = err.config?.url || ''
+    // ✅ Don't redirect on auth endpoints — firebase-login and other auth routes
+    // legitimately return 401 and the calling hook handles it via toast
+    const isAuthEndpoint = url.includes('/auth/')
+    if (err.response?.status === 401 && !isAuthEndpoint) {
+      localStorage.clear()
+      window.location.href = '/login'
+    }
     return Promise.reject(err)
   }
 )
@@ -28,6 +35,9 @@ export const authApi = {
   resendOtp:       (data) => api.post('/auth/resend-otp', data),
   changeUsername:  (data) => api.put('/auth/change-username', data),
   getMe:           ()     => api.get('/auth/me'),
+
+  // ✅ Firebase OAuth login (Google / GitHub)
+  firebaseLogin:   (data) => api.post('/auth/firebase-login', data),
 }
 
 // ── Aptitude ──────────────────────────────────────────────────────────────
