@@ -114,7 +114,7 @@ export default function HRPage() {
         wpm,
       }])
     } catch {
-      toast.error('Transcription failed. Check your Groq API key.')
+      toast.error('Transcription failed. Please try again.')
     }
   }
 

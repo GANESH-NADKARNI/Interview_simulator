@@ -62,7 +62,7 @@ export default function AptitudePage() {
       setCurrent(0)
       setState('quiz')
     } catch (e) {
-      toast.error('Failed to generate questions. Check your Groq API key.')
+      toast.error('Failed to generate questions.Please try again.')
       setState('idle')
     }
   }
@@ -136,7 +136,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
       setResult(data)
       setState('result')
     } catch (e) {
-      toast.error('Evaluation failed')
+      toast.error('Evaluation failed,Please try again.')
       setState('quiz')
     }
   }
