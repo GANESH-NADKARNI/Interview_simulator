@@ -62,7 +62,7 @@ export default function AptitudePage() {
       setCurrent(0)
       setState('quiz')
     } catch (e) {
-      toast.error('Unable to generate questions. Please try again.')
+      toast.error('Failed to generate questions. Check your Groq API key.')
       setState('idle')
     }
   }
@@ -136,7 +136,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
       setResult(data)
       setState('result')
     } catch (e) {
-      toast.error('Evaluation failed. Please try again.')
+      toast.error('Evaluation failed')
       setState('quiz')
     }
   }
@@ -150,7 +150,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
     setQuestionTimes({})
   }
 
-  // ── IDLE ───────────────────────────────────────────────────────────────────
+  // ── IDLE ──────────────────────────────────────────────────────────────────
   if (state === 'idle') return (
     <div className="fade-in" style={{ maxWidth: 700, margin: '0 auto' }}>
       <div style={{ textAlign: 'center', padding: '60px 20px' }}>
@@ -182,7 +182,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
     </div>
   )
 
-  // ── QUIZ ───────────────────────────────────────────────────────────────────
+  // ── QUIZ ──────────────────────────────────────────────────────────────────
   if (state === 'quiz') {
     const q = questions[current]
     const answered = Object.keys(answers).length
@@ -213,7 +213,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
         </div>
 
         {hasVisual && (
-          <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 16, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', fontSize: 13, color: 'var(--yellow)' }}>
+          <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 16, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', fontSize: 13, color: 'var(--yellow)', display: 'flex', gap: 8, alignItems: 'center' }}>
             ⚠️ This question references a visual that cannot be displayed. The data is embedded in the question text.
           </div>
         )}
@@ -232,8 +232,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
             const selected = answers[q.id] === letter
             return (
               <button key={opt} onClick={() => selectAnswer(q.id, opt)}
-                style={{ padding: '14px 18px', borderRadius: 12, textAlign: 'left', cursor: 'pointer', border: `1px solid ${selected ? 'var(--accent)' : 'var(--border2)'}`, background: selected ? 'var(--accent2)' : 'var(--card)', color: 'var(--text)', transition: 'all 0.2s', fontSize: 14 }}
-              >
+                style={{ padding: '14px 18px', borderRadius: 12, textAlign: 'left', cursor: 'pointer', border: `1px solid ${selected ? 'var(--accent)' : 'var(--border2)'}`, background: selected ? 'rgba(0,212,255,0.08)' : 'var(--card)', color: selected ? 'var(--accent)' : 'var(--text)', fontFamily: 'var(--font)', fontSize: 14, transition: 'all 0.15s', fontWeight: selected ? 600 : 400 }}>
                 {opt}
               </button>
             )
@@ -247,8 +246,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
           <div style={{ display: 'flex', gap: 6 }}>
             {questions.map((_, i) => (
               <button key={i} onClick={() => navigateTo(i)}
-                style={{ width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: i === current ? 'var(--accent)' : answers[questions[i].id] ? 'var(--green)' : 'var(--bg2)', color: i === current || answers[questions[i].id] ? '#000' : 'inherit', transition: 'all 0.2s' }}
-              >
+                style={{ width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: i === current ? 'var(--accent)' : answers[questions[i]?.id] ? 'rgba(0,255,136,0.2)' : 'var(--bg2)', color: i === current ? '#000' : answers[questions[i]?.id] ? 'var(--green)' : 'var(--text3)' }}>
                 {i + 1}
               </button>
             ))}
@@ -263,7 +261,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
     )
   }
 
-  // ── RESULT ──────────────────────────────────────────────────────────────────
+  // ── RESULT ────────────────────────────────────────────────────────────────
   if (state === 'result' && result) {
     const scoreColor = result.totalScore >= 70 ? 'var(--green)' : result.totalScore >= 40 ? 'var(--yellow)' : 'var(--red)'
     const totalQ = result.questionFeedback?.length || 10
@@ -286,7 +284,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
       <div className="fade-in" style={{ maxWidth: 900, margin: '0 auto' }}>
         {/* Score card */}
         <div className="card card-glow" style={{ textAlign: 'center', marginBottom: 24, padding: 40 }}>
-          <div style={{ width: 120, height: 120, borderRadius: '50%', margin: '0 auto 20px', background: `conic-gradient(${scoreColor} ${result.totalScore * 3.6}deg, var(--bg2) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 120, height: 120, borderRadius: '50%', margin: '0 auto 20px', background: `conic-gradient(${scoreColor} ${result.totalScore * 3.6}deg, var(--bg2) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 30px ${scoreColor}40` }}>
             <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'var(--card)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 30, fontFamily: 'var(--display)', fontWeight: 800, color: scoreColor }}>{result.totalScore}</span>
               <span style={{ fontSize: 11, color: 'var(--text3)' }}>/ 100</span>
@@ -329,7 +327,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
                 const tColor = t <= 30 ? 'var(--green)' : t <= 60 ? 'var(--yellow)' : 'var(--red)'
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: qf.isCorrect ? 'var(--green)' : 'var(--red)', color: '#000' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: qf.isCorrect ? 'rgba(0,255,136,0.15)' : 'rgba(255,68,102,0.15)', color: qf.isCorrect ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
                       Q{i + 1}
                     </div>
                     <div style={{ flex: 1, height: 6, background: 'var(--bg2)', borderRadius: 3, overflow: 'hidden' }}>
@@ -367,7 +365,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
                   <span style={{ color: 'var(--text3)' }}>{t.correct}/{t.total}</span>
                 </div>
                 <div style={{ height: 6, background: 'var(--bg2)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 3, transition: 'width 0.6s', width: `${(t.correct / Math.max(t.total, 1)) * 100}%`, background: t.correct / Math.max(t.total, 1) >= 0.7 ? 'var(--green)' : t.correct / Math.max(t.total, 1) >= 0.4 ? 'var(--yellow)' : 'var(--red)' }} />
+                  <div style={{ height: '100%', borderRadius: 3, transition: 'width 0.6s', width: `${(t.correct / Math.max(t.total, 1)) * 100}%`, background: t.correct / Math.max(t.total, 1) >= 0.7 ? 'var(--green)' : 'var(--yellow)' }} />
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>{t.advice}</p>
               </div>
@@ -382,7 +380,7 @@ data.topicWiseAnalysis = Object.values(topicMap)
               const q = questions.find(x => String(x.id) === String(qf.questionId))
               const isCorrect = qf.isCorrect
               return (
-                <div key={i} style={{ padding: 14, borderRadius: 10, border: `1px solid ${isCorrect ? 'rgba(0,255,136,0.2)' : 'rgba(255,68,102,0.2)'}`, background: isCorrect ? 'rgba(0,255,136,0.05)' : 'rgba(255,68,102,0.05)' }}>
+                <div key={i} style={{ padding: 14, borderRadius: 10, border: `1px solid ${isCorrect ? 'rgba(0,255,136,0.2)' : 'rgba(255,68,102,0.2)'}`, background: isCorrect ? 'rgba(0,255,136,0.04)' : 'rgba(255,68,102,0.04)' }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     {isCorrect ? <CheckCircle size={16} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} /> : <XCircle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 2 }} />}
                     <div style={{ width: '100%' }}>
